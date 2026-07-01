@@ -118,7 +118,7 @@ send({"cmd": "led_seq", "sequence": [
 
 ## 协议参考
 
-- [DG-LAB 爪印 V1.1 蓝牙协议](https://github.com/dg-lab/dglab)
+- [DG-LAB 爪印 V1.1 蓝牙协议]([https://github.com/dg-lab/dglab](https://github.com/dungeonlab-open/dglab-bluetooth-protocol/blob/main/paw-prints/README.md))
 
 ## License
 
