@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>爪印控制面板</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #c9d1d9;
+    --text-dim: #6e7681;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d2991d;
+    --purple: #bc8cff;
+    --cyan: #39d2c0;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---- 顶栏 ---- */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--red);
+    display: inline-block; margin-right: 6px;
+  }
+  .status-dot.online { background: var(--green); }
+  .status-text { font-size: 13px; color: var(--text-dim); }
+  .battery-badge {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; font-size: 13px; margin-left: 12px;
+  }
+  .battery-badge .val { color: var(--accent); font-weight: 600; }
+
+  /* ---- 主布局 ---- */
+  main {
+    display: flex; flex: 1; overflow: hidden;
+  }
+
+  /* ---- 左侧面板 ---- */
+  .left-panel {
+    width: 340px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 16px;
+    overflow-y: auto;
+  }
+
+  /* ---- 右侧内容 ---- */
+  .right-panel {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ---- 卡片 ---- */
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px;
+  }
+  .card h3 {
+    font-size: 13px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+
+  /* ---- 按钮 ---- */
+  button {
+    background: #21262d; border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 8px 14px;
+    font-size: 13px; cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  button:hover { background: #30363d; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; }
+  button.primary:hover { background: #388bfd; }
+  button.danger { background: #da3633; border-color: #da3633; }
+  button.danger:hover { background: #f85149; }
+  button.active { background: #238636; border-color: #238636; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.sm { padding: 4px 10px; font-size: 12px; }
+
+  /* ---- 输入框 ---- */
+  input, select {
+    background: #0d1117; border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 7px 10px;
+    font-size: 13px; width: 100%;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+  /* ---- 扫描列表 ---- */
+  .device-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; }
+  .device-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; background: var(--surface); border-radius: 6px;
+    border: 1px solid var(--border); cursor: pointer; transition: all 0.15s;
+  }
+  .device-item:hover { border-color: var(--accent); }
+  .device-item .name { font-size: 13px; font-weight: 500; }
+  .device-item .addr { font-size: 11px; color: var(--text-dim); }
+  .device-item .rssi { font-size: 11px; color: var(--accent); }
+  .scanning { color: var(--yellow); font-size: 13px; font-style: italic; }
+
+  /* ---- 颜色选择器 ---- */
+  .color-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .color-swatch {
+    width: 100%; aspect-ratio: 1.5; border-radius: 6px;
+    border: 2px solid transparent; cursor: pointer; transition: all 0.15s;
+  }
+  .color-swatch:hover { transform: scale(1.05); }
+  .color-swatch.selected { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.3); }
+
+  /* ---- 仪表盘 ---- */
+  .dashboard {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px; padding: 8px 16px;
+    flex-shrink: 0;
+  }
+  .gauge {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 6px; text-align: center;
+  }
+  .gauge .label { font-size: 9px; color: var(--text-dim); margin-bottom: 2px; }
+  .gauge .value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .gauge .unit { font-size: 10px; color: var(--text-dim); }
+  .gauge.x .value { color: var(--red); }
+  .gauge.y .value { color: var(--green); }
+  .gauge.z .value { color: var(--accent); }
+  .gauge.accel .value { color: var(--yellow); }
+  .gauge.volt .value { color: var(--cyan); }
+  .gauge.btn .value { color: var(--purple); }
+
+  .btn-indicator {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--text-dim); margin-right: 6px; vertical-align: middle;
+  }
+  .btn-indicator.pressed { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  /* ---- 图表区 ---- */
+  .chart-area {
+    flex: 1; min-height: 0; padding: 16px; display: flex; flex-direction: column;
+  }
+  .chart-container {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; position: relative;
+  }
+  .chart-legend {
+    position: absolute; top: 10px; right: 14px;
+    display: flex; gap: 12px; font-size: 11px;
+  }
+  .chart-legend span { display: flex; align-items: center; gap: 4px; }
+  .chart-legend .dot {
+    width: 8px; height: 8px; border-radius: 2px; display: inline-block;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---- 统计 ---- */
+  .stats-row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .stat-card {
+    flex: 1; min-width: 60px; background: var(--surface);
+    border-radius: 6px; padding: 8px 10px; text-align: center;
+  }
+  .stat-val { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .stat-lbl { font-size: 9px; color: var(--text-dim); margin-top: 2px; }
+
+  /* ---- 事件日志 ---- */
+  .log-area {
+    height: 140px; flex-shrink: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 10px 16px; overflow-y: auto; font-family: 'SF Mono', 'Cascadia Code', monospace;
+    font-size: 12px; line-height: 1.6;
+  }
+  .log-entry { display: flex; gap: 8px; }
+  .log-entry .ts { color: var(--text-dim); flex-shrink: 0; }
+  .log-entry .msg { word-break: break-all; }
+  .log-entry.event { color: var(--green); }
+  .log-entry.d0 { color: var(--cyan); }
+  .log-entry.error { color: var(--red); }
+  .log-entry.info { color: var(--text-dim); }
+
+  /* ---- 设备标签 ---- */
+  .device-tabs {
+    display: flex; align-items: center;
+    padding: 6px 16px; background: var(--surface);
+    border-bottom: 1px solid var(--border); overflow-x: auto;
+  }
+  .device-tab {
+    padding: 4px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; color: var(--text-dim); white-space: nowrap;
+    border: 1px solid transparent; transition: all 0.15s;
+  }
+  .device-tab:hover { color: var(--text); border-color: var(--border); }
+  .device-tab.active { color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.1); }
+
+  /* ---- 分析面板 ---- */
+  .analysis-panel { margin-bottom: 4px; }
+
+  /* ---- 响应式 ---- */
+  @media (max-width: 900px) {
+    main { flex-direction: column; }
+    .left-panel { width: 100%; max-height: none; overflow-y: visible; }
+    .right-panel { width: 100%; }
+    .dashboard { grid-template-columns: repeat(3, 1fr); }
+    .chart-area { height: 200px; }
+    .log-area { height: 100px; }
+    .stats-row { gap: 4px; }
+    .stat-card { padding: 6px 4px; }
+    .stat-val { font-size: 14px; }
+    button.sm { font-size: 11px; padding: 5px 8px; }
+  }
+
+  @media (max-width: 480px) {
+    body { padding: 6px; }
+    .header { padding: 10px; }
+    .header h1 { font-size: 18px; }
+    .card { padding: 10px; }
+    .card h3 { font-size: 13px; }
+    .dashboard { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .gauge { padding: 8px; }
+    .gauge .value { font-size: 22px; }
+    .chart-area { height: 160px; }
+    .log-area { height: 80px; font-size: 10px; }
+    .stats-row { gap: 3px; }
+    .stat-card { min-width: 44px; padding: 4px 2px; }
+    .stat-val { font-size: 12px; }
+    .stat-lbl { font-size: 7px; }
+    button { font-size: 11px; padding: 6px 10px; }
+    button.sm { font-size: 10px; padding: 4px 6px; }
+    .color-swatch { width: 28px; height: 28px; }
+    input, select { font-size: 14px; } /* 防 iOS 缩放 */
+  }
+</style>
+</head>
+<body>
+
+<!-- ====== 顶栏 ====== -->
+<header>
+  <div style="display:flex;align-items:center;">
+    <span class="status-dot" id="statusDot"></span>
+    <div>
+      <h1>🐾 爪印控制面板</h1>
+      <span class="status-text" id="statusText">未连接</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span class="battery-badge" id="batteryBadge" style="display:none">
+      🔋 <span class="val" id="batteryVal">--</span>%
+    </span>
+    <span style="font-size:12px;color:var(--text-dim)">WS <span id="wsStatus">●</span></span>
+  </div>
+</header>
+
+<!-- 设备标签栏 -->
+<div class="device-tabs" id="deviceTabs" style="display:none;">
+  <span style="font-size:12px;color:var(--text-dim);margin-right:8px;">设备:</span>
+  <div id="tabList" style="display:flex;gap:4px;"></div>
+</div>
+
+<!-- 分析面板 -->
+<div class="analysis-panel" id="analysisPanel" style="display:none;">
+  <div class="card" style="margin:0 16px 8px 16px;">
+    <h3>📊 差值分析</h3>
+    <div class="stats-row" style="margin-bottom:0;">
+      <div class="stat-card"><div class="stat-val" id="diffX">0</div><div class="stat-lbl">ΔX</div></div>
+      <div class="stat-card"><div class="stat-val" id="diffY">0</div><div class="stat-lbl">ΔY</div></div>
+      <div class="stat-card"><div class="stat-val" id="diffZ">0</div><div class="stat-lbl">ΔZ</div></div>
+      <div class="stat-card"><div class="stat-val" id="diffAccel">0</div><div class="stat-lbl">Δ加速度</div></div>
+      <div class="stat-card"><div class="stat-val" id="diffAbs">0</div><div class="stat-lbl">欧氏距离</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 主体 ====== -->
+<main>
+  <!-- 左侧面板 -->
+  <div class="left-panel">
+
+    <!-- 连接 -->
+    <div class="card">
+      <h3>📡 设备连接</h3>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <button class="primary" id="btnScan" onclick="doScan()" style="flex:1;">🔍 扫描</button>
+        <button class="danger" id="btnDisconnect" onclick="doDisconnect()" disabled>断开</button>
+      </div>
+      <div class="device-list" id="deviceList">
+        <span style="color:var(--text-dim);font-size:12px;">点击扫描搜索设备...</span>
+      </div>
+      <div id="recentDevices" style="margin-top:8px;display:none;">
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">📌 最近连接</div>
+        <div id="recentList"></div>
+      </div>
+    </div>
+
+    <!-- D0 开关 -->
+    <div class="card">
+      <h3>📊 D0 实时数据</h3>
+      <div style="display:flex;gap:6px;">
+        <button class="active" id="btnD0Start" onclick="doD0Start()" disabled style="flex:1;">▶ 开启 D0</button>
+        <button id="btnD0Stop" onclick="doD0Stop()" style="flex:1;">⏹ 停止 D0</button>
+      </div>
+    </div>
+
+    <!-- LED 控制 -->
+    <div class="card">
+      <h3>💡 主指示灯</h3>
+      <div class="color-grid" id="colorGrid">
+      </div>
+    </div>
+
+    <!-- 肩灯控制 -->
+    <div class="card">
+      <h3>🔦 肩灯控制</h3>
+      <div style="display:flex;gap:4px;align-items:center;margin-bottom:8px;">
+        <span style="font-size:12px;color:var(--text-dim);width:32px;">色1</span>
+        <select id="flashC1" style="flex:1;"></select>
+        <span style="font-size:12px;color:var(--text-dim);width:32px;">色2</span>
+        <select id="flashC2" style="flex:1;"></select>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="sm" onclick="doFlash('slow')" style="flex:1;">慢闪</button>
+        <button class="sm" onclick="doFlash('fast')" style="flex:1;">快闪</button>
+        <button class="sm" onclick="doFlash('stop')" style="flex:1;">停止</button>
+      </div>
+    </div>
+
+    <!-- 快捷操作 -->
+    <div class="card">
+      <h3>⚡ 快捷操作</h3>
+      <div style="display:flex;gap:6px;">
+        <button class="sm" onclick="doCmd5F()" style="flex:1;">重置参数</button>
+        <button class="sm" onclick="doCmd60()" style="flex:1;">自动角度校准</button>
+      </div>
+    </div>
+
+    <!-- Agent TCP 密钥 -->
+    <div class="card">
+      <h3>🤖 Agent 连接</h3>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">
+        TCP: 127.0.0.1:9878
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:6px;">
+        <input id="agentKey" type="text" readonly style="flex:1;font-size:11px;font-family:monospace;background:var(--bg-dark);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;" value="加载中...">
+        <button class="sm" onclick="copyKey()" title="复制">📋</button>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="sm" onclick="regenerateKey()" style="flex:1;">🔄 重新生成</button>
+        <button class="sm" onclick="toggleKey()" id="btnToggleKey" style="flex:1;">👁 显示</button>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:6px;" id="keyHint">
+        连接方式: <code style="background:var(--bg-dark);padding:1px 4px;border-radius:2px;">{"auth":"&lt;密钥&gt;"}\n</code>
+      </div>
+    </div>
+
+    <!-- 录制 -->
+    <div class="card">
+      <h3>📼 数据录制 <span style="font-size:10px;color:var(--text-dim);" id="recStatus"></span></h3>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button class="primary" id="btnRecStart" onclick="doRecStart()" style="flex:1;">⏺ 开始录制</button>
+        <button class="danger" id="btnRecStop" onclick="doRecStop()" disabled>⏹ 停止</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);" id="recInfo">未录制</div>
+      <div id="recFileList" style="margin-top:6px;max-height:120px;overflow-y:auto;">
+        <div style="font-size:11px;color:var(--text-dim);">📁 录制文件</div>
+        <div id="recFiles" style="font-size:10px;color:var(--text-dim);"></div>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:6px;align-items:center;">
+        <button class="sm" onclick="doRecPlay()" id="btnRecPlay" disabled style="flex:1;">▶ 回放</button>
+        <select id="recSpeed" style="font-size:10px;padding:2px 4px;">
+          <option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option>
+        </select>
+        <button class="sm" onclick="doRecStopPlay()" id="btnRecStopPlay" disabled>⏹</button>
+      </div>
+    </div>
+
+    <!-- Webhook -->
+    <div class="card">
+      <h3>📤 事件推送</h3>
+      <input id="whUrl" type="text" placeholder="Webhook URL (如 OBS/HTTP 服务)" style="width:100%;font-size:11px;padding:4px 6px;box-sizing:border-box;margin-bottom:6px;background:var(--bg-dark);border:1px solid var(--border);color:var(--text);border-radius:4px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+        <label style="font-size:11px;"><input type="checkbox" class="whEvt" value="d0"> D0</label>
+        <label style="font-size:11px;"><input type="checkbox" class="whEvt" value="5a"> 触发</label>
+        <label style="font-size:11px;"><input type="checkbox" class="whEvt" value="5b"> 取消</label>
+        <label style="font-size:11px;"><input type="checkbox" class="whEvt" value="5c"> 参数</label>
+      </div>
+      <button class="sm primary" onclick="doWebhookSave()" style="width:100%;">💾 保存配置</button>
+    </div>
+  </div>
+
+  <!-- 右侧面板 -->
+  <div class="right-panel">
+    <!-- 仪表盘 -->
+    <div class="dashboard" id="dashboard">
+      <div class="gauge x">
+        <div class="label">X 轴角度</div>
+        <div class="value" id="gX">0</div>
+        <div class="unit">deg</div>
+      </div>
+      <div class="gauge y">
+        <div class="label">Y 轴角度</div>
+        <div class="value" id="gY">0</div>
+        <div class="unit">deg</div>
+      </div>
+      <div class="gauge z">
+        <div class="label">Z 轴角度</div>
+        <div class="value" id="gZ">0</div>
+        <div class="unit">deg</div>
+      </div>
+      <div class="gauge accel">
+        <div class="label">加速度</div>
+        <div class="value" id="gAccel">0</div>
+        <div class="unit">raw</div>
+      </div>
+      <div class="gauge volt">
+        <div class="label">外部电压</div>
+        <div class="value" id="gVolt">0</div>
+        <div class="unit">V</div>
+      </div>
+      <div class="gauge btn">
+        <div class="label">按钮状态</div>
+        <div class="value" style="font-size:20px;">
+          <span class="btn-indicator" id="btnInd"></span>
+          <span id="gBtn">抬起</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计 -->
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="stats-row" id="statsRow" style="flex:1;margin-bottom:0;">
+        <div class="stat-card"><div class="stat-val" id="statPress">0</div><div class="stat-lbl">按钮按下</div></div>
+        <div class="stat-card"><div class="stat-val" id="statMaxX">0</div><div class="stat-lbl">X 最大</div></div>
+        <div class="stat-card"><div class="stat-val" id="statMaxY">0</div><div class="stat-lbl">Y 最大</div></div>
+        <div class="stat-card"><div class="stat-val" id="statMaxZ">0</div><div class="stat-lbl">Z 最大</div></div>
+        <div class="stat-card"><div class="stat-val" id="statAvgAccel">0</div><div class="stat-lbl">平均加速度</div></div>
+        <div class="stat-card"><div class="stat-val" id="statElapsed">0s</div><div class="stat-lbl">运行时长</div></div>
+      </div>
+      <button class="sm" onclick="doResetAnalysis()" style="flex-shrink:0;" title="重置统计和图表">🔄 重置</button>
+    </div>
+
+    <!-- 角度曲线图 -->
+    <div class="chart-area">
+      <div class="chart-container" id="chartContainer">
+        <div class="chart-legend">
+          <span><span class="dot" style="background:var(--red)"></span> X</span>
+          <span><span class="dot" style="background:var(--green)"></span> Y</span>
+          <span><span class="dot" style="background:var(--accent)"></span> Z</span>
+          <span><span class="dot" style="background:#d2991d"></span> 加速度</span>
+        </div>
+        <canvas id="chartCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- 坐标轴调节 -->
+    <div style="display:flex;gap:6px;align-items:center;padding:4px 16px;background:var(--surface);border-top:1px solid var(--border);font-size:11px;">
+      <span style="color:var(--text-dim);">Y轴范围:</span>
+      <select id="yAxisRange" onchange="updateYAxis()" style="font-size:11px;padding:2px 4px;">
+        <option value="30">±30°</option><option value="60">±60°</option><option value="90">±90°</option><option value="140" selected>±140°</option><option value="180">±180°</option>
+      </select>
+      <span style="color:var(--text-dim);margin-left:8px;">| 日志</span>
+      <button class="sm" onclick="toggleLog()" id="btnToggleLog" style="font-size:10px;">▼</button>
+    </div>
+
+    <!-- 事件日志 -->
+    <div class="log-area" id="logArea">
+      <div class="log-entry info">
+        <span class="ts">--:--:--</span>
+        <span class="msg">等待连接...</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ============================================================
+// 状态
+// ============================================================
+const STATE = {
+  ws: null,
+  connected: false,
+  d0Active: false,
+  battery: -1,
+  devices: {},        // {device_id: {name, battery, connected}}
+  activeDevice: null,  // device_id | 'fusion' | 'analysis' | null
+  lastD0: {},         // {device_id: {...latest D0}}
+};
+
+// 颜色到名称映射
+const COLOR_NAMES = {1:'黄',2:'红',3:'紫',4:'蓝',5:'青',6:'绿',7:'白'};
+
+// 主指示灯颜色 (协议只支持 0x01~0x06)
+const MAIN_COLORS = [
+  { id:0x01, name:'黄', hex:'#d2991d' },
+  { id:0x02, name:'红', hex:'#f85149' },
+  { id:0x03, name:'紫', hex:'#bc8cff' },
+  { id:0x04, name:'蓝', hex:'#58a6ff' },
+  { id:0x05, name:'青', hex:'#39d2c0' },
+  { id:0x06, name:'绿', hex:'#3fb950' },
+];
+// 肩灯颜色 (支持 0x00~0x07)
+const SHOULDER_COLORS = [
+  { id:0x00, name:'熄灭', hex:'#484f58' },
+  ...MAIN_COLORS,
+  { id:0x07, name:'白', hex:'#e6edf3' },
+];
+
+// 曲线图数据缓存
+const CHART_HISTORY = 300; // 存 300 个点 (约 30 秒)
+const chartData = { x:[], y:[], z:[], accel:[] };
+let chartData2 = { x:[], y:[], z:[], accel:[] };  // 第二台设备
+
+// ============================================================
+// WebSocket
+// ============================================================
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws`);
+  STATE.ws = ws;
+
+  ws.onopen = () => {
+    document.getElementById('wsStatus').textContent = '🟢';
+    addLog('info', 'WebSocket 已连接');
+  };
+
+  ws.onclose = () => {
+    document.getElementById('wsStatus').textContent = '🔴';
+    addLog('error', 'WebSocket 断开，3秒后重连...');
+    STATE.connected = false;
+    STATE.d0Active = false;
+    updateUI();
+    setTimeout(connectWS, 3000);
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      handleMessage(msg);
+    } catch (err) {
+      console.error('解析消息失败:', err);
+    }
+  };
+}
+
+function send(cmd, data = {}) {
+  if (STATE.ws && STATE.ws.readyState === WebSocket.OPEN) {
+    // 非融合/分析模式时，自动附加 device_id
+    if (STATE.activeDevice !== null && STATE.activeDevice !== 'fusion' && STATE.activeDevice !== 'analysis') {
+      if (data.device_id === undefined && ['connect','scan','disconnect'].indexOf(cmd) === -1) {
+        data.device_id = STATE.activeDevice;
+      }
+    }
+    STATE.ws.send(JSON.stringify({ cmd, data }));
+  }
+}
+
+// ============================================================
+// 消息处理
+// ============================================================
+function handleMessage(msg) {
+  const { type, data } = msg;
+
+  switch (type) {
+    case 'devices':
+      renderDevices(data);
+      break;
+
+    case 'scan_result':
+      // 渐进扫描：逐条添加设备
+      addScanResult(data);
+      break;
+
+    case 'scan_done':
+      document.getElementById('btnScan').disabled = false;
+      document.getElementById('btnScan').textContent = '🔍 扫描';
+      if (!document.getElementById('deviceList').textContent.trim()) {
+        document.getElementById('deviceList').innerHTML = '<span style="color:var(--text-dim);font-size:12px;">未发现爪印设备</span>';
+      }
+      break;
+
+    case 'devices_info':
+      STATE.devices = {};
+      (data.devices || []).forEach(d => { STATE.devices[d.device_id] = d; });
+      const ids = Object.keys(STATE.devices).map(Number);
+      if (!STATE.activeDevice && ids.length === 1) {
+        STATE.activeDevice = ids[0];
+        const devColor = STATE.devices[ids[0]]?._ledColor;
+        if (devColor) { selectedColor = devColor; renderColorPicker(); }
+      }
+      if (STATE.activeDevice !== null && !STATE.devices[STATE.activeDevice]) {
+        STATE.activeDevice = ids.length > 0 ? ids[0] : null;
+      }
+      STATE.connected = ids.some(id => STATE.devices[id]?.connected);
+      renderDeviceTabs();
+      updateUI();
+      // 清除连接中状态
+      document.getElementById('btnScan').disabled = false;
+      document.getElementById('btnScan').textContent = '🔍 扫描';
+      document.getElementById('deviceList').querySelectorAll('.scanning').forEach(e => e.remove());
+      // 新连接的设备自动分配主指示灯颜色
+      const colors = [0x01, 0x04, 0x06, 0x03, 0x05, 0x02]; // 黄蓝绿紫青红 轮流
+      ids.forEach(id => {
+        if (STATE.devices[id]?.connected && !STATE.devices[id]._colored) {
+          STATE.devices[id]._colored = true;
+          const color = colors[id % colors.length];
+          STATE.devices[id]._ledColor = color;
+          send('cmd_50_no_trigger', { device_id: id, led_color: color });
+          addLog('info', `爪印${id} 主灯→${COLOR_NAMES[color]}`);
+          // 当前活动设备时同步颜色选择器
+          if (STATE.activeDevice === id) { selectedColor = color; renderColorPicker(); }
+          renderDeviceTabs();
+        }
+      });
+      break;
+
+    case 'connected':
+      // devices_info 处理更完整，这里做兜底
+      updateUI();
+      loadRecentDevices();
+      break;
+
+    case 'disconnected':
+      // 刷新设备列表
+      updateUI();
+      loadRecentDevices();
+      break;
+
+    case 'notify_51':
+      const did51 = data.device_id;
+      if (did51 !== undefined && STATE.devices[did51]) {
+        STATE.devices[did51].battery = data.battery;
+        renderDeviceTabs();
+      }
+      break;
+
+    case 'notify_d0':
+      STATE.lastD0[data.device_id || 0] = data;
+
+      if (STATE.activeDevice === 'fusion') {
+        const did = data.device_id || 0;
+        const ids = Object.keys(STATE.devices).map(Number).sort();
+        console.log('fusion D0:', did, 'ids:', ids, 'c1:', chartData.x.length, 'c2:', chartData2.x.length);
+        if (ids.length < 2) { updateDashboard(data); updateChart(data); drawChart(); break; }
+        if (did === ids[0]) { console.log('  -> chartData'); pushChart(chartData, data); }
+        else { console.log('  -> chartData2'); pushChart(chartData2, data); }
+        if (STATE.lastD0[ids[0]] && STATE.lastD0[ids[1]]) {
+          updateFusionDashboard(STATE.lastD0[ids[0]], STATE.lastD0[ids[1]]);
+        }
+        drawChart();
+      } else if (STATE.activeDevice === 'analysis') {
+        const did = data.device_id || 0;
+        const ids = Object.keys(STATE.devices).map(Number).sort();
+        if (ids.length < 2) break;
+        if (did === ids[0]) pushChart(chartData, data);
+        else pushChart(chartData2, data);
+        if (STATE.lastD0[ids[0]] && STATE.lastD0[ids[1]]) {
+          updateAnalysisPanel(STATE.lastD0[ids[0]], STATE.lastD0[ids[1]]);
+        }
+        drawChart();
+      } else {
+        // 单设备模式
+        const did = data.device_id;
+        if (STATE.activeDevice !== null && did !== STATE.activeDevice) break;
+        updateDashboard(data);
+        updateChart(data);
+        updateStats(data);
+      }
+      break;
+
+    case 'notify_5a':
+      addLog('event', `⚡ 事件触发: ID=${data.event_id} 参数=${data.param_value}`);
+      break;
+
+    case 'notify_5b':
+      addLog('info', `⏹ 取消触发: ID=${data.event_id}`);
+      break;
+
+    case 'notify_5c':
+      addLog('info', `📊 参数变化: ID=${data.event_id} 参数=${data.param_value}`);
+      break;
+
+    case 'notify_f1':
+      addLog('info', `📐 角度阈值: X[${data.x_range}], Y[${data.y_range}], Z[${data.z_range}]`);
+      break;
+
+    case 'error':
+      addLog('error', `❌ ${data.message}`);
+      break;
+  }
+}
+
+// ============================================================
+// 设备标签
+// ============================================================
+function renderDeviceTabs() {
+  const container = document.getElementById('deviceTabs');
+  const list = document.getElementById('tabList');
+  // 只显示已连接的设备
+  const ids = Object.keys(STATE.devices).map(Number).filter(id => STATE.devices[id]?.connected);
+  if (ids.length === 0) { container.style.display = 'none'; STATE.activeDevice = null; return; }
+  container.style.display = 'flex';
+
+  let html = ids.map(id => {
+    const d = STATE.devices[id];
+    const act = STATE.activeDevice === id ? ' active' : '';
+    const bat = d.battery >= 0 ? ` 🔋${d.battery}%` : ' 🔋?';
+    const ledColor = d._ledColor || 0;
+    const ledDot = ledColor ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${MAIN_COLORS.find(c=>c.id===ledColor)?.hex||'#888'};margin-right:2px;" title="${COLOR_NAMES[ledColor]||''}灯"></span>` : '';
+    return `<div class="device-tab${act}" onclick="switchDevice(${id})">${ledDot}爪印${id} ${bat}<span onclick="event.stopPropagation();doDisconnectDevice(${id})" style="margin-left:6px;color:var(--text-dim);font-size:10px;" title="断开">✕</span></div>`;
+  }).join('');
+
+  if (ids.length >= 2) {
+    html += `<div class="device-tab${STATE.activeDevice==='fusion'?' active':''}" onclick="switchDevice('fusion')">🔀 融合</div>`;
+    html += `<div class="device-tab${STATE.activeDevice==='analysis'?' active':''}" onclick="switchDevice('analysis')">📊 分析</div>`;
+  }
+
+  list.innerHTML = html;
+  document.getElementById('analysisPanel').style.display = STATE.activeDevice === 'analysis' ? '' : 'none';
+}
+
+function switchDevice(id) {
+  STATE.activeDevice = id;
+  renderDeviceTabs();
+  // 单设备模式同步颜色选择器
+  if (typeof id === 'number' && STATE.devices[id]) {
+    const devColor = STATE.devices[id]._ledColor;
+    if (devColor) { selectedColor = devColor; renderColorPicker(); }
+  }
+  addLog('info', id === 'fusion' ? '切换到融合模式' : id === 'analysis' ? '切换到分析模式' : `切换到设备 ${id}`);
+  if (id === 'fusion' || id === 'analysis') {
+    chartData.x.length = 0; chartData.y.length = 0; chartData.z.length = 0; chartData.accel.length = 0;
+    chartData2.x.length = 0; chartData2.y.length = 0; chartData2.z.length = 0; chartData2.accel.length = 0;
+    resetStats();
+    // 自动开启所有设备的 D0 模式
+    Object.keys(STATE.devices).map(Number).forEach(did => {
+      if (STATE.devices[did]?.connected) {
+        send('cmd_50_d0', { device_id: did, led_color: STATE.devices[did]._ledColor || 0x01 });
+      }
+    });
+    STATE.d0Active = true;
+  }
+}
+
+// ============================================================
+// 设备扫描 & 连接
+// ============================================================
+function doScan() {
+  const btn = document.getElementById('btnScan');
+  btn.disabled = true;
+  btn.textContent = '⏳ 扫描中...';
+  _scanStarted = false;
+  _scanDevices = {};
+  document.getElementById('deviceList').innerHTML =
+    '<span class="scanning">正在扫描...</span>';
+  send('scan', { timeout: 5 });
+}
+
+let _scanDevices = {};  // 渐进扫描暂存
+let _scanStarted = false;
+
+function addScanResult(d) {
+  if (!_scanStarted) {
+    _scanDevices = {};
+    _scanStarted = true;
+    document.getElementById('deviceList').innerHTML = '';
+  }
+  if (_scanDevices[d.address]) return;  // 去重
+  _scanDevices[d.address] = d;
+  const el = document.getElementById('deviceList');
+  el.innerHTML += `
+    <div class="device-item" onclick="doConnect('${d.address}')">
+      <div>
+        <div class="name">🐾 ${d.name}</div>
+        <div class="addr">${d.address}</div>
+      </div>
+      <div class="rssi">${d.rssi} dBm${d.distance ? ' ≈' + d.distance + 'm' : ''}</div>
+    </div>`;
+}
+
+function renderDevices(devices) {
+  _scanDevices = {};
+  _scanStarted = false;
+  const el = document.getElementById('deviceList');
+  if (!devices.length) {
+    el.innerHTML = '<span style="color:var(--text-dim);font-size:12px;">未发现爪印设备</span>';
+    return;
+  }
+  el.innerHTML = devices.map(d => `
+    <div class="device-item" onclick="doConnect('${d.address}')">
+      <div>
+        <div class="name">🐾 ${d.name}</div>
+        <div class="addr">${d.address}</div>
+      </div>
+      <div class="rssi">${d.rssi} dBm${d.distance ? ' ≈' + d.distance + 'm' : ''}</div>
+    </div>
+  `).join('');
+}
+
+function doConnect(address) {
+  // 检查是否已连接——已连接则直接切换
+  for (const [id, dev] of Object.entries(STATE.devices)) {
+    if (dev.address === address && dev.connected) {
+      switchDevice(Number(id));
+      addLog('info', `已连接，切换到爪印${id}`);
+      return;
+    }
+  }
+  addLog('info', `正在连接 ${address}...`);
+  const el = document.getElementById('deviceList');
+  const existing = el.innerHTML;
+  el.innerHTML = existing + '<div class="scanning" style="margin-top:4px;">⏳ 连接中...</div>';
+  send('connect', { address, name: address });
+  setTimeout(() => {
+    const scanning = el.querySelector('.scanning');
+    if (scanning) scanning.remove();
+  }, 5000);
+}
+
+function doDisconnect() {
+  send('disconnect');
+  // 清空全部
+  Object.keys(STATE.devices).forEach(id => { STATE.devices[id].connected = false; });
+  STATE.lastD0 = {};
+  STATE.activeDevice = null;
+  renderDeviceTabs();
+  updateUI();
+}
+
+function doDisconnectDevice(id) {
+  send('disconnect', { device_id: id });
+  STATE.devices[id].connected = false;
+  delete STATE.lastD0[id];
+  if (STATE.activeDevice === id) STATE.activeDevice = null;
+  renderDeviceTabs();
+  updateUI();
+  addLog('info', `已断开爪印${id}`);
+}
+
+// ============================================================
+// 最近连接设备
+// ============================================================
+async function loadRecentDevices() {
+  try {
+    const r = await fetch('/api/devices/recent');
+    const data = await r.json();
+    renderRecentDevices(data.devices);
+  } catch (e) {
+    // 静默
+  }
+}
+
+function renderRecentDevices(devices) {
+  const container = document.getElementById('recentDevices');
+  const list = document.getElementById('recentList');
+  if (!devices || !devices.length) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = '';
+  list.innerHTML = devices.map(d => `
+    <div class="device-item" onclick="doConnect('${d.address}')" style="font-size:12px;">
+      <div>
+        <div class="name">🐾 ${d.name}</div>
+        <div class="addr">${d.address} · ${d.last_connected?.slice(0,16) || ''}</div>
+      </div>
+      <span style="color:var(--accent);cursor:pointer;">连接→</span>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// D0 模式
+// ============================================================
+function doD0Start() {
+  const led = getSelectedColor();
+  send('cmd_50_d0', { led_color: led });
+  STATE.d0Active = true;
+  updateUI();
+  addLog('info', '已开启 D0 直传模式');
+}
+
+function doD0Stop() {
+  const led = getSelectedColor();
+  send('cmd_50_no_trigger', { led_color: led });
+  STATE.d0Active = false;
+  updateUI();
+  addLog('info', '已停止 D0');
+}
+
+// ============================================================
+// LED 控制
+// ============================================================
+let selectedColor = 0x01;
+
+function getSelectedColor() { return selectedColor; }
+
+// 肩灯状态追踪（切主灯后恢复用）
+let _shoulderState = { c1: 2, c2: 4, speed: 0 }; // speed: 0=常亮, 1=慢闪, 2=快闪
+
+function renderColorPicker() {
+  const grid = document.getElementById('colorGrid');
+  grid.innerHTML = MAIN_COLORS.map(c => `
+    <div class="color-swatch${c.id === selectedColor ? ' selected' : ''}"
+         style="background:${c.hex}"
+         title="${c.name}"
+         onclick="selectColor(${c.id})"></div>
+  `).join('');
+
+  // 填充肩灯下拉
+  const opts = SHOULDER_COLORS.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('flashC1').innerHTML = opts;
+  document.getElementById('flashC2').innerHTML = opts;
+  document.getElementById('flashC1').value = String(_shoulderState.c1);
+  document.getElementById('flashC2').value = String(_shoulderState.c2);
+}
+
+function restoreShoulder() {
+  if (_shoulderState.speed === 0) {
+    // 常亮（不恢复，因为肩灯本来就是独立控制）
+  } else if (_shoulderState.speed === 3) {
+    send('cmd_70_solid', { color: 0 });
+  } else {
+    send('cmd_70_flash', { color1: _shoulderState.c1, color2: _shoulderState.c2, speed: _shoulderState.speed });
+  }
+}
+
+function selectColor(id) {
+  if (!STATE.connected) { addLog('warn', '请先连接设备'); return; }
+  selectedColor = id;
+  // 记录当前设备的颜色
+  if (STATE.activeDevice !== null && STATE.activeDevice !== 'fusion' && STATE.activeDevice !== 'analysis') {
+    STATE.devices[STATE.activeDevice]._ledColor = id;
+    renderDeviceTabs();
+  }
+  renderColorPicker();
+  if (STATE.d0Active) {
+    send('cmd_50_d0', { led_color: id });
+  } else {
+    send('cmd_50_no_trigger', { led_color: id });
+  }
+  setTimeout(restoreShoulder, 50);
+}
+
+function doFlash(speed) {
+  if (!STATE.connected) { addLog('warn', '请先连接设备'); return; }
+  const c1 = parseInt(document.getElementById('flashC1').value);
+  const c2 = parseInt(document.getElementById('flashC2').value);
+  const speedMap = { slow: 0x01, fast: 0x02, stop: 0x03 };
+  const s = speedMap[speed];
+  _shoulderState = { c1, c2, speed: s };
+  send('cmd_70_flash', { color1: c1, color2: c2, speed: s });
+}
+// ============================================================
+// 快捷操作
+// ============================================================
+function doCmd5F() {
+  if (!STATE.connected) { addLog('warn', '请先连接设备'); return; }
+  send('cmd_5f');
+  addLog('info', '已发送参数重置指令');
+}
+
+function doCmd60() {
+  if (!STATE.connected) { addLog('warn', '请先连接设备'); return; }
+  send('cmd_60');
+  addLog('info', '已发送自动角度校准指令...');
+}
+
+// ============================================================
+// 统计
+// ============================================================
+const stats = {
+  presses: 0, maxX: -999, minX: 999, maxY: -999, minY: 999,
+  maxZ: -999, minZ: 999, accelSum: 0, accelCount: 0, startTime: 0,
+};
+let _prevPressed = false;
+
+function resetStats() {
+  stats.presses = 0; stats.maxX = -999; stats.minX = 999;
+  stats.maxY = -999; stats.minY = 999; stats.maxZ = -999; stats.minZ = 999;
+  stats.accelSum = 0; stats.accelCount = 0; stats.startTime = Date.now();
+  _prevPressed = false;
+}
+
+function updateStats(d) {
+  if (!stats.startTime) stats.startTime = Date.now();
+  if (d.pressed && !_prevPressed) stats.presses++;
+  _prevPressed = d.pressed;
+  if (d.angle_x > stats.maxX) stats.maxX = d.angle_x;
+  if (d.angle_x < stats.minX) stats.minX = d.angle_x;
+  if (d.angle_y > stats.maxY) stats.maxY = d.angle_y;
+  if (d.angle_y < stats.minY) stats.minY = d.angle_y;
+  if (d.angle_z > stats.maxZ) stats.maxZ = d.angle_z;
+  if (d.angle_z < stats.minZ) stats.minZ = d.angle_z;
+  stats.accelSum += d.acceleration;
+  stats.accelCount++;
+  renderStats();
+}
+
+function renderStats() {
+  const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  el('statPress', stats.presses);
+  el('statMaxX', stats.maxX > -999 ? stats.maxX : '-');
+  el('statMaxY', stats.maxY > -999 ? stats.maxY : '-');
+  el('statMaxZ', stats.maxZ > -999 ? stats.maxZ : '-');
+  const avg = stats.accelCount > 0 ? Math.round(stats.accelSum / stats.accelCount) : 0;
+  el('statAvgAccel', avg);
+  const sec = stats.startTime ? Math.round((Date.now() - stats.startTime) / 1000) : 0;
+  el('statElapsed', sec > 60 ? `${Math.floor(sec/60)}m${sec%60}s` : `${sec}s`);
+}
+
+// ============================================================
+// 录制
+// ============================================================
+let _recSelectedFile = null;
+let _recPlayTimer = null;
+
+async function doRecStart() {
+  await fetch('/api/record/start', { method: 'POST' });
+  updateRecUI();
+  addLog('info', '录制已开始');
+}
+
+async function doRecStop() {
+  await fetch('/api/record/stop', { method: 'POST' });
+  updateRecUI();
+  loadRecFiles();
+  addLog('info', '录制已停止');
+}
+
+async function updateRecUI() {
+  try {
+    const r = await fetch('/api/record/status');
+    const s = await r.json();
+    const status = document.getElementById('recStatus');
+    const info = document.getElementById('recInfo');
+    const btnS = document.getElementById('btnRecStart');
+    const btnP = document.getElementById('btnRecStop');
+    if (s.recording) {
+      status.textContent = '🔴';
+      info.textContent = `录制中: ${s.filename} · ${s.count} 条 · ${s.elapsed}s`;
+      btnS.disabled = true; btnP.disabled = false;
+    } else {
+      status.textContent = '';
+      info.textContent = '未录制';
+      btnS.disabled = false; btnP.disabled = true;
+    }
+  } catch (e) {}
+}
+
+async function loadRecFiles() {
+  try {
+    const r = await fetch('/api/record/list');
+    const data = await r.json();
+    const el = document.getElementById('recFiles');
+    if (!data.files.length) { el.innerHTML = '<span>暂无</span>'; _recSelectedFile = null; return; }
+    el.innerHTML = data.files.map(f => `
+      <div style="display:flex;align-items:center;gap:4px;padding:2px 0;">
+        <span style="flex:1;cursor:pointer;${_recSelectedFile===f.filename?'color:var(--accent);':''}"
+              onclick="selectRecFile('${f.filename}')">
+          📄 ${f.filename} <span style="color:var(--text-dim);">${f.rows}条 ${f.size_kb}KB</span>
+        </span>
+        <a href="/api/record/download?file=${encodeURIComponent(f.filename)}" download
+           style="color:var(--text-dim);text-decoration:none;font-size:12px;" title="下载">⬇</a>
+      </div>`).join('');
+  } catch (e) {}
+}
+
+function selectRecFile(name) {
+  _recSelectedFile = name;
+  document.getElementById('btnRecPlay').disabled = false;
+  loadRecFiles();
+}
+
+async function doRecPlay() {
+  if (!_recSelectedFile) return;
+  const speed = parseFloat(document.getElementById('recSpeed').value);
+  const r = await fetch(`/api/record/load?file=${encodeURIComponent(_recSelectedFile)}`);
+  const j = await r.json();
+  if (!j.data.length) return;
+  _recStopPlay();
+  document.getElementById('btnRecPlay').disabled = true;
+  document.getElementById('btnRecStopPlay').disabled = false;
+  resetStats();
+  chartData.x.length = chartData.y.length = chartData.z.length = chartData.accel.length = 0;
+  addLog('info', `回放: ${_recSelectedFile} (${j.data.length}条, ${speed}x)`);
+  let i = 0;
+  const step = () => {
+    if (i >= j.data.length) { _recStopPlay(); return; }
+    const d = j.data[i];
+    updateDashboard(d);
+    updateStats(d);
+    chartData.x.push(d.angle_x); chartData.y.push(d.angle_y);
+    chartData.z.push(d.angle_z); chartData.accel.push(d.acceleration);
+    if (chartData.x.length > CHART_HISTORY) {
+      chartData.x.shift(); chartData.y.shift(); chartData.z.shift(); chartData.accel.shift();
+    }
+    drawChart();
+    i++;
+    _recPlayTimer = setTimeout(step, 100 / speed);
+  };
+  step();
+}
+
+function _recStopPlay() {
+  if (_recPlayTimer) { clearTimeout(_recPlayTimer); _recPlayTimer = null; }
+  document.getElementById('btnRecPlay').disabled = !_recSelectedFile;
+  document.getElementById('btnRecStopPlay').disabled = true;
+}
+
+function doRecStopPlay() { _recStopPlay(); addLog('info', '回放已停止'); }
+
+// ============================================================
+// Webhook
+// ============================================================
+async function loadWebhookConfig() {
+  try {
+    const r = await fetch('/api/webhook/config');
+    const c = await r.json();
+    document.getElementById('whUrl').value = c.url || '';
+    document.querySelectorAll('.whEvt').forEach(cb => {
+      cb.checked = c.events.includes(cb.value);
+    });
+  } catch (e) {}
+}
+
+async function doWebhookSave() {
+  const url = document.getElementById('whUrl').value.trim();
+  const events = [...document.querySelectorAll('.whEvt:checked')].map(cb => cb.value);
+  await fetch('/api/webhook/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, events }),
+  });
+  addLog('info', `Webhook 已保存: ${url} (${events.join(',')})`);
+}
+
+// ============================================================
+// Agent 密钥管理
+// ============================================================
+let _keyVisible = false;
+
+async function loadKey() {
+  try {
+    const r = await fetch('/api/key');
+    const data = await r.json();
+    displayKey(data.key);
+  } catch (e) {
+    document.getElementById('agentKey').value = '加载失败';
+  }
+}
+
+function displayKey(key) {
+  const el = document.getElementById('agentKey');
+  if (_keyVisible) {
+    el.value = key;
+  } else {
+    el.value = key.slice(0, 8) + '••••••••••••••••' + key.slice(-8);
+  }
+  el.dataset.key = key;
+}
+
+function toggleKey() {
+  _keyVisible = !_keyVisible;
+  const btn = document.getElementById('btnToggleKey');
+  btn.textContent = _keyVisible ? '🙈 隐藏' : '👁 显示';
+  const key = document.getElementById('agentKey').dataset.key || '';
+  displayKey(key);
+}
+
+async function regenerateKey() {
+  try {
+    const r = await fetch('/api/key/regenerate', { method: 'POST' });
+    const data = await r.json();
+    _keyVisible = true;
+    displayKey(data.key);
+    document.getElementById('btnToggleKey').textContent = '🙈 隐藏';
+    addLog('info', '密钥已重新生成');
+  } catch (e) {
+    addLog('error', '密钥生成失败');
+  }
+}
+
+function copyKey() {
+  const key = document.getElementById('agentKey').dataset.key || '';
+  navigator.clipboard.writeText(key).then(() => {
+    addLog('info', '密钥已复制到剪贴板');
+  }).catch(() => {
+    // 回退方案
+    const el = document.getElementById('agentKey');
+    el.type = 'text';
+    el.select();
+    document.execCommand('copy');
+    addLog('info', '密钥已复制（请手动 Ctrl+C）');
+  });
+}
+
+// ============================================================
+// 仪表盘更新
+// ============================================================
+function updateDashboard(d) {
+  document.getElementById('gX').textContent = d.angle_x;
+  document.getElementById('gY').textContent = d.angle_y;
+  document.getElementById('gZ').textContent = d.angle_z;
+  document.getElementById('gAccel').textContent = d.acceleration;
+  document.getElementById('gVolt').textContent = (d.voltage || 0).toFixed(2);
+
+  const btnInd = document.getElementById('btnInd');
+  const gBtn = document.getElementById('gBtn');
+  if (d.pressed) {
+    btnInd.className = 'btn-indicator pressed';
+    gBtn.textContent = '按下';
+  } else {
+    btnInd.className = 'btn-indicator';
+    gBtn.textContent = '抬起';
+  }
+}
+
+// ============================================================
+// 融合模式
+// ============================================================
+function pushChart(buf, d) {
+  buf.x.push(d.angle_x); buf.y.push(d.angle_y);
+  buf.z.push(d.angle_z); buf.accel.push(d.acceleration);
+  if (buf.x.length > CHART_HISTORY) {
+    buf.x.shift(); buf.y.shift(); buf.z.shift(); buf.accel.shift();
+  }
+}
+
+function updateFusionDashboard(d1, d2) {
+  document.getElementById('gX').textContent = `${d1.angle_x} / ${d2.angle_x}`;
+  document.getElementById('gY').textContent = `${d1.angle_y} / ${d2.angle_y}`;
+  document.getElementById('gZ').textContent = `${d1.angle_z} / ${d2.angle_z}`;
+  document.getElementById('gAccel').textContent = `${d1.acceleration} / ${d2.acceleration}`;
+  document.getElementById('gVolt').textContent = `${(d1.voltage||0).toFixed(2)} / ${(d2.voltage||0).toFixed(2)}`;
+  // 按钮状态 (用文字)
+  const btnInd = document.getElementById('btnInd');
+  const gBtn = document.getElementById('gBtn');
+  if (d1.pressed || d2.pressed) {
+    btnInd.className = 'btn-indicator pressed';
+    gBtn.textContent = `${d1.pressed ? '按下' : '抬起'} / ${d2.pressed ? '按下' : '抬起'}`;
+  } else {
+    btnInd.className = 'btn-indicator';
+    gBtn.textContent = '抬起 / 抬起';
+  }
+  // 运行时长
+  if (!stats.startTime) stats.startTime = Date.now();
+  const sec = Math.round((Date.now() - stats.startTime) / 1000);
+  document.getElementById('statElapsed').textContent = sec > 60 ? `${Math.floor(sec/60)}m${sec%60}s` : `${sec}s`;
+}
+
+function updateAnalysisPanel(d1, d2) {
+  const dx = d1.angle_x - d2.angle_x;
+  const dy = d1.angle_y - d2.angle_y;
+  const dz = d1.angle_z - d2.angle_z;
+  const da = d1.acceleration - d2.acceleration;
+  const abs = Math.sqrt(dx*dx + dy*dy + dz*dz).toFixed(1);
+  document.getElementById('diffX').textContent = (dx > 0 ? '+' : '') + dx;
+  document.getElementById('diffY').textContent = (dy > 0 ? '+' : '') + dy;
+  document.getElementById('diffZ').textContent = (dz > 0 ? '+' : '') + dz;
+  document.getElementById('diffAccel').textContent = (da > 0 ? '+' : '') + da;
+  document.getElementById('diffAbs').textContent = abs;
+}
+
+// ============================================================
+// 角度曲线图
+// ============================================================
+function updateChart(d) {
+  chartData.x.push(d.angle_x);
+  chartData.y.push(d.angle_y);
+  chartData.z.push(d.angle_z);
+  chartData.accel.push(d.acceleration);
+
+  // 限制长度
+  if (chartData.x.length > CHART_HISTORY) {
+    chartData.x.shift();
+    chartData.y.shift();
+    chartData.z.shift();
+    chartData.accel.shift();
+  }
+
+  drawChart();
+}
+
+function drawChart() {
+  const container = document.getElementById('chartContainer');
+  const canvas = document.getElementById('chartCanvas');
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width * (window.devicePixelRatio || 1);
+  canvas.height = rect.height * (window.devicePixelRatio || 1);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const len = chartData.x.length;
+  if (len < 2) {
+    ctx.fillStyle = '#6e7681';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('等待 D0 数据...', W/2, H/2);
+    return;
+  }
+
+  // 坐标变换
+  const pad = { top: 30, right: 20, bottom: 20, left: 40 };
+  const pw = W - pad.left - pad.right;
+  const ph = H - pad.top - pad.bottom;
+  const midY = pad.top + ph / 2;
+  const yRange = parseInt(document.getElementById('yAxisRange').value) || 140;
+  const scaleY = ph / 2 / yRange;
+
+  function toX(i) { return pad.left + (i / (CHART_HISTORY - 1)) * pw; }
+  function toY(v) { return midY - v * scaleY; }
+
+  // 网格
+  const gridStep = yRange <= 60 ? 15 : yRange <= 90 ? 30 : 40;
+  ctx.strokeStyle = '#21262d';
+  ctx.lineWidth = 0.5;
+  for (let v = -yRange; v <= yRange; v += gridStep) {
+    const y = toY(v);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + pw, y);
+    ctx.stroke();
+    ctx.fillStyle = '#6e7681';
+    ctx.font = '10px sans-serif';
+    ctx.fillText(v, 2, y + 3);
+  }
+
+  // 右 Y 轴 — 加速度 (0 ~ 400)
+  const accelMax = 400;
+  const scaleAccel = ph / accelMax;
+  function toYAccel(v) { return pad.top + ph - v * scaleAccel; }
+  for (let v = 0; v <= accelMax; v += 100) {
+    const y = toYAccel(v);
+    ctx.fillStyle = '#6e7681';
+    ctx.font = '10px sans-serif';
+    ctx.fillText(v, W - pad.right - 28, y + 3);
+  }
+
+  // 零线
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, midY);
+  ctx.lineTo(pad.left + pw, midY);
+  ctx.stroke();
+
+  // 数据线
+  const offset = len - CHART_HISTORY;  // 如果不满 300 个点
+
+  function drawLine(series, color) {
+    if (series.length < 2) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < series.length; i++) {
+      const x = toX(offset + i);
+      const y = toY(series[i]);
+      if (!started) { ctx.moveTo(x, y); started = true; }
+      else { ctx.lineTo(x, y); }
+    }
+    ctx.stroke();
+  }
+
+  function drawAccelLine(series, color) {
+    if (series.length < 2) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < series.length; i++) {
+      const x = toX(offset + i);
+      const y = toYAccel(series[i]);
+      if (!started) { ctx.moveTo(x, y); started = true; }
+      else { ctx.lineTo(x, y); }
+    }
+    ctx.stroke();
+  }
+
+  drawLine(chartData.x, '#f85149');
+  drawLine(chartData.y, '#3fb950');
+  drawLine(chartData.z, '#58a6ff');
+  drawAccelLine(chartData.accel, '#d2991d');
+
+  // 融合/分析模式：第二台设备虚线
+  if ((STATE.activeDevice === 'fusion' || STATE.activeDevice === 'analysis') && chartData2.x.length >= 2) {
+    ctx.setLineDash([6, 4]);
+    drawLine(chartData2.x, '#ff8a80');
+    drawLine(chartData2.y, '#69f0ae');
+    drawLine(chartData2.z, '#82b1ff');
+    drawAccelLine(chartData2.accel, '#ffc107');
+    ctx.setLineDash([]);
+  }
+}
+
+// ============================================================
+// 坐标轴 + 日志折叠
+// ============================================================
+function updateYAxis() { drawChart(); }
+function toggleLog() {
+  const log = document.getElementById('logArea');
+  const btn = document.getElementById('btnToggleLog');
+  if (log.style.display === 'none') {
+    log.style.display = ''; btn.textContent = '▼';
+  } else {
+    log.style.display = 'none'; btn.textContent = '▶';
+  }
+}
+
+function doResetAnalysis() {
+  resetStats();
+  chartData.x.length = 0; chartData.y.length = 0; chartData.z.length = 0; chartData.accel.length = 0;
+  chartData2.x.length = 0; chartData2.y.length = 0; chartData2.z.length = 0; chartData2.accel.length = 0;
+  addLog('info', '统计和曲线已重置');
+  drawChart();
+}
+
+// ============================================================
+// 事件日志
+// ============================================================
+function addLog(cls, msg) {
+  const el = document.getElementById('logArea');
+  const now = new Date();
+  const ts = now.toTimeString().slice(0, 8);
+  el.innerHTML += `<div class="log-entry ${cls}"><span class="ts">${ts}</span><span class="msg">${msg}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ============================================================
+// UI 更新
+// ============================================================
+function updateUI() {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  const badge = document.getElementById('batteryBadge');
+  const btnScan = document.getElementById('btnScan');
+  const btnDisc = document.getElementById('btnDisconnect');
+  const btnD0 = document.getElementById('btnD0Start');
+
+  if (STATE.connected) {
+    dot.className = 'status-dot online';
+    const count = Object.values(STATE.devices).filter(d => d.connected).length;
+    txt.textContent = `已连接 ${count} 台`;
+    badge.style.display = 'none';  // 右上角不显示电量，改为标签栏显示
+    btnDisc.disabled = false;
+    btnD0.disabled = false;
+    btnScan.disabled = false;
+    if (STATE.d0Active) {
+      btnD0.classList.add('active');
+      btnD0.textContent = '✓ D0 运行中';
+    } else {
+      btnD0.classList.remove('active');
+      btnD0.textContent = '▶ 开启 D0';
+    }
+  } else {
+    dot.className = 'status-dot';
+    txt.textContent = '未连接';
+    badge.style.display = 'none';
+    btnDisc.disabled = true;
+    btnD0.disabled = true;
+    btnD0.classList.remove('active');
+    btnD0.textContent = '▶ 开启 D0';
+    btnScan.disabled = false;
+  }
+}
+
+// ============================================================
+// 窗口 resize → 重绘图表
+// ============================================================
+window.addEventListener('resize', drawChart);
+
+// ============================================================
+// 初始化
+// ============================================================
+renderColorPicker();
+updateUI();
+loadKey();
+loadRecentDevices();
+loadRecFiles();
+loadWebhookConfig();
+updateRecUI();
+connectWS();
+</script>
+</body>
+</html>
