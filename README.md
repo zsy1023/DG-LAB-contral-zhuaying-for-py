@@ -33,7 +33,7 @@ DG-LAB 爪印无线按钮传感器的 Web 蓝牙控制面板。支持多设备�
 
 ```bash
 git clone https://github.com/zsy1023/DG-LAB-contral-zhuaying-for-py.git
-cd backend
+cd DG-LAB-contral-zhuaying-for-py\backend
 pip install -r requirements.txt
 cd ..
 python run.py
