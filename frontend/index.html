@@ -526,7 +526,8 @@ const SHOULDER_COLORS = [
 ];
 
 // 曲线图数据缓存
-const CHART_HISTORY = 300; // 存 300 个点 (约 30 秒)
+const CHART_HISTORY = 150; // 存 150 个点 (约 15 秒)
+let _renderPending = false;  // rAF 合并渲染
 const chartData = { x:[], y:[], z:[], accel:[] };
 let chartData2 = { x:[], y:[], z:[], accel:[] };  // 第二台设备
 
@@ -659,14 +660,13 @@ function handleMessage(msg) {
       if (STATE.activeDevice === 'fusion') {
         const did = data.device_id || 0;
         const ids = Object.keys(STATE.devices).map(Number).sort();
-        console.log('fusion D0:', did, 'ids:', ids, 'c1:', chartData.x.length, 'c2:', chartData2.x.length);
-        if (ids.length < 2) { updateDashboard(data); updateChart(data); drawChart(); break; }
-        if (did === ids[0]) { console.log('  -> chartData'); pushChart(chartData, data); }
-        else { console.log('  -> chartData2'); pushChart(chartData2, data); }
+        if (ids.length < 2) { updateDashboard(data); pushChart(chartData, data); scheduleDraw(); break; }
+        if (did === ids[0]) pushChart(chartData, data);
+        else pushChart(chartData2, data);
         if (STATE.lastD0[ids[0]] && STATE.lastD0[ids[1]]) {
           updateFusionDashboard(STATE.lastD0[ids[0]], STATE.lastD0[ids[1]]);
         }
-        drawChart();
+        scheduleDraw();
       } else if (STATE.activeDevice === 'analysis') {
         const did = data.device_id || 0;
         const ids = Object.keys(STATE.devices).map(Number).sort();
@@ -676,14 +676,14 @@ function handleMessage(msg) {
         if (STATE.lastD0[ids[0]] && STATE.lastD0[ids[1]]) {
           updateAnalysisPanel(STATE.lastD0[ids[0]], STATE.lastD0[ids[1]]);
         }
-        drawChart();
+        scheduleDraw();
       } else {
-        // 单设备模式
         const did = data.device_id;
         if (STATE.activeDevice !== null && did !== STATE.activeDevice) break;
         updateDashboard(data);
-        updateChart(data);
+        pushChart(chartData, data);
         updateStats(data);
+        scheduleDraw();
       }
       break;
 
@@ -1289,16 +1289,10 @@ function updateChart(d) {
   chartData.y.push(d.angle_y);
   chartData.z.push(d.angle_z);
   chartData.accel.push(d.acceleration);
-
-  // 限制长度
   if (chartData.x.length > CHART_HISTORY) {
-    chartData.x.shift();
-    chartData.y.shift();
-    chartData.z.shift();
-    chartData.accel.shift();
+    chartData.x.shift(); chartData.y.shift(); chartData.z.shift(); chartData.accel.shift();
   }
-
-  drawChart();
+  // drawChart 由 scheduleDraw 统一调度，这里不再单独调用
 }
 
 function drawChart() {
@@ -1424,6 +1418,14 @@ function drawChart() {
 // 坐标轴 + 日志折叠
 // ============================================================
 function updateYAxis() { drawChart(); }
+
+// rAF 节流：合并重绘，每帧最多一次
+function scheduleDraw() {
+  if (!_renderPending) {
+    _renderPending = true;
+    requestAnimationFrame(() => { _renderPending = false; drawChart(); });
+  }
+}
 function toggleLog() {
   const log = document.getElementById('logArea');
   const btn = document.getElementById('btnToggleLog');
@@ -1439,7 +1441,7 @@ function doResetAnalysis() {
   chartData.x.length = 0; chartData.y.length = 0; chartData.z.length = 0; chartData.accel.length = 0;
   chartData2.x.length = 0; chartData2.y.length = 0; chartData2.z.length = 0; chartData2.accel.length = 0;
   addLog('info', '统计和曲线已重置');
-  drawChart();
+  scheduleDraw();
 }
 
 // ============================================================
