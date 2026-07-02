@@ -13,9 +13,14 @@ URL = "http://127.0.0.1:9879"
 def check_deps():
     req_path = os.path.join(BACKEND_DIR, "requirements.txt")
     print("📦 检查依赖...")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-r", req_path, "-q"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "-r", req_path, "-q"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        print("❌ 依赖安装失败，尝试手动安装：")
+        print(f"   pip install -r {req_path}")
+        sys.exit(1)
 
 
 def wait_for_server(timeout_sec: float = 10) -> bool:
