@@ -30,7 +30,7 @@ DG-LAB 爪印无线按钮传感器的 Web 蓝牙控制面板。支持多设备�
 - 蓝牙适配器（BLE 4.0+）
 
 ### 安装运行
-
+首先确保你有Python环境，和git
 ```bash
 git clone https://github.com/zsy1023/DG-LAB-contral-zhuaying-for-py.git
 cd DG-LAB-contral-zhuaying-for-py\backend
